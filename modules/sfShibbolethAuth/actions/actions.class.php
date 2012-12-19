@@ -3,17 +3,17 @@
 /**
  * Shibboleth support module.
  *
- * This module's job is simply to (a) simulate Shibboleth well enough 
+ * This module's job is simply to (a) simulate Shibboleth well enough
  * to exercise the Shibboleth filter, and (b) in real production
  * with real Shibboleth, act as a landing point that redirects to
  * the more interesting URL of your choice after login.
  *
  * The principle here: in production Shibboleth should be configured to protect
  * this module's URL (via a <Location> block).
- * 
+ *
  * If login_on_secure is true (which is typical in production environments,
- * because Shibboleth usually isn't set up to protect non-secure pages), 
- * attempts to reach executeLogin or executeLogout via an http URL get 
+ * because Shibboleth usually isn't set up to protect non-secure pages),
+ * attempts to reach executeLogin or executeLogout via an http URL get
  * kicked over to the https version of the same URL.
  *
  * This is NOT the place to call sfGuard's signIn. That logic belongs in the
@@ -40,34 +40,45 @@ class sfShibbolethAuthActions extends sfActions
 
     // In development, with shibboleth_fake set to true,
     // this action lets the developer pick one of a number of
-    // test users in a manner that exercises the code in 
+    // test users in a manner that exercises the code in
     // the shibboleth filter just as much as real Shibboleth would.
 
-    if (sfConfig::get('app_sfShibboleth_fake', false)) {
+    if (sfConfig::get('app_sfShibboleth_fake', false))
+    {
       // Let them pick a fake user
       $fakeUsers = sfConfig::get('app_sfShibboleth_fake_users', false);
-      if (!$fakeUsers) {
+      if (!$fakeUsers)
+      {
         return $this->forward404();
       }
-      $this->options = array();
-      foreach ($fakeUsers as $id => $data) 
+
+      if ($this->hasRequestParameter('fake_user'))
       {
-        $this->options[$id] = $data['display_name'];
-      }
-      if ($this->hasRequestParameter('fake_user')) {
-        $fakeUser = $this->getRequestParameter('fake_user'); 
-        if (!isset($fakeUsers[$fakeUser])) {
+        $fakeUser = $this->getRequestParameter('fake_user');
+        if (!isset($fakeUsers[$fakeUser]))
+        {
           return $this->forward404();
         }
+
         $fakeDisplayName = $fakeUsers[$fakeUser]['display_name'];
         $sfUser->setAttribute('sfShibboleth_fake_user', $fakeUser);
         $sfUser->setAttribute('sfShibboleth_fake_display_name', $fakeDisplayName);
-      } else {
+        $sfUser->setAttribute('sfShibboleth_fake_puid', $fakeUsers[$fakeUser]['puid']);
+        $sfUser->setAttribute('sfShibboleth_fake_studentnumber', $fakeUsers[$fakeUser]['studentNumber']);
+        $sfUser->setAttribute('sfShibboleth_fake_firstname', $fakeUsers[$fakeUser]['givenName']);
+        $sfUser->setAttribute('sfShibboleth_fake_lastname', $fakeUsers[$fakeUser]['sn']);
+      }
+      else
+      {
         // Display the fake user picker
+        $this->form = new sfShibbolethFakeUserForm();
+
         return sfView::SUCCESS;
       }
-    } else {
-      if (!isset($_SERVER['REMOTE_USER'])) 
+    }
+    else
+    {
+      if (!isset($_SERVER['REMOTE_USER']))
       {
         $shim = sfConfig::get('app_sfShibboleth_shim', false);
         if ($shim)
@@ -77,28 +88,33 @@ class sfShibbolethAuthActions extends sfActions
         }
         else
         {
-          return 'Misconfigured';
+            //return 'Misconfigured';
+            //$this->redirect('/Shibboleth.sso/Login');
+            return 'Lazyshib';
         }
       }
     }
+
     // DON'T try to set this to the referrer here. In a true
     // Shibboleth environment, a redirect to Shibboleth will
     // already have ruined that option. See sfShibbolethDemoHome for an
-    // example of how to correctly set this attribute in 
+    // example of how to correctly set this attribute in
     // YOUR OWN login action which then redirects to this action.
     $after = $sfUser->getAttribute('sfShibboleth_after', '@homepage');
     $sfUser->setAttribute('sfShibboleth_after', null);
-    return $this->redirect($after);
+
+    return $this->redirect('@homepage');
   }
+
   // This action signs the user out of Symfony, and then out of
   // Shibboleth as well. In production the latter is done by redirecting
   // to the Shibboleth logout URL. If your Apache configuration uses
   // a different logout URL, you'll need to make the appropriate change
   // in app.yml. If the logout URL supports a URL to return the user to,
   // take advantage of that by including a _RETURNTO_ placeholder
-  // in the URL you configure. 
+  // in the URL you configure.
 
-  // In development this action purges the attributes we use for fake 
+  // In development this action purges the attributes we use for fake
   // shibboleth auth first, then goes to the home page. It also attempts to
   // send the user to an appropriate logout URL Keep in mind
   // that typical shibboleth webauth systems unfortunately do NOT send you
@@ -118,15 +134,15 @@ class sfShibbolethAuthActions extends sfActions
     }
     if (!sfConfig::get('app_sfShibboleth_fake', false)) {
       $returnTo = $this->getController()->genUrl("@homepage", true);
-      $to = sfConfig::get('app_sfShibboleth_logout', 
-        $this->getRequest()->getUriPrefix() . '/Shibboleth.sso/Logout?returnto=_RETURNTO_');
+      $to = sfConfig::get('app_sfShibboleth_logout',
+        $this->getRequest()->getUriPrefix() . '/Shibboleth.sso/Logout?return=_RETURNTO_');
       $to = str_replace(array("_RETURNTO_", "_HTTPHOST_"), array(urlencode($returnTo), $_SERVER['HTTP_HOST']), $to);
+      $sfUser->setFlash('notice', 'You have successfully logged out.');
       return $this->redirect($to);
     }
-    $sfUser = $this->getUser();
     $sfUser->setAttribute('sf_shibboleth_fake_user', null);
     $sfUser->setAttribute('sf_shibboleth_fake_display_name', null);
-    // @homepage works, / doesn't (at least not in all routing setups) 
+    // @homepage works, / doesn't (at least not in all routing setups)
     return $this->redirect('@homepage');
   }
 

@@ -12,7 +12,7 @@
  * then bring them back to the same action with the same parameters.
  *
  * Support is provided for fetching display names (full names)
- * from Shibboleth, if Shibboleth is set up to provide them. 
+ * from Shibboleth, if Shibboleth is set up to provide them.
  * Specifically, this filter will set the 'display_name' attribute
  * of the sfUser object, which you should utilize when creating a
  * brand-new sfGuardUserProfile object. This filter will also
@@ -28,15 +28,15 @@ class sfShibbolethFilter extends sfFilter
 		$context = $this->getContext();
     $sfUser = $context->getUser();
 		$request = $context->getRequest();
-   
-    if (sfConfig::get('app_sfShibboleth_fake', false)) 
+
+    if (sfConfig::get('app_sfShibboleth_fake', false))
     {
       // Accept the fake shibboleth attributes and stuff them into the
       // environment so that the rest of the Shibboleth-related code is used
       // normally. This way we don't have to debug everything twice.
-      $_SERVER['REMOTE_USER'] = 
+      $_SERVER['REMOTE_USER'] =
         $sfUser->getAttribute('sfShibboleth_fake_user', null);
-      $_SERVER['HTTP_SHIB_INETORGPERSON_DISPLAYNAME'] = 
+      $_SERVER['HTTP_SHIB_INETORGPERSON_DISPLAYNAME'] =
         $sfUser->getAttribute('sfShibboleth_fake_display_name', null);
       // If we let these linger they will screw up logout
       $sfUser->setAttribute('sfShibboleth_fake_user', null);
@@ -49,7 +49,7 @@ class sfShibbolethFilter extends sfFilter
       if (isset($_SERVER['REMOTE_USER']) && (in_array($_SERVER['REMOTE_USER'], self::$testNames)))
       {
         throw new sfException("Attempt to log in with a noshib test account in a Shibbolized environment");
-      } 
+      }
     }
 
     if (sfConfig::get('app_sfShibboleth_shim', false))
@@ -57,12 +57,12 @@ class sfShibbolethFilter extends sfFilter
       if (isset($_SESSION['sfShibboleth_shim_user']))
       {
         // user attributes from the subfolder shim script. This allows the
-        // use of Shibboleth to protect a variety of sensitive activities 
-        // throughout the site without the need to apply the Shibboleth 
+        // use of Shibboleth to protect a variety of sensitive activities
+        // throughout the site without the need to apply the Shibboleth
         // login prompt to the entire site.
-        $_SERVER['REMOTE_USER'] = 
+        $_SERVER['REMOTE_USER'] =
           $_SESSION['sfShibboleth_shim_user'];
-        $_SERVER['HTTP_SHIB_INETORGPERSON_DISPLAYNAME'] = 
+        $_SERVER['HTTP_SHIB_INETORGPERSON_DISPLAYNAME'] =
           $_SESSION['sfShibboleth_shim_display_name'];
         // If we let these linger they will screw up logout
         unset($_SESSION['sfShibboleth_shim_user']);
@@ -84,12 +84,12 @@ class sfShibbolethFilter extends sfFilter
        * action if need be, then allow them to continue to the action
        * they were originally trying to access.
 			 */
-			if (isset($_SERVER['HTTP_SHIB_INETORGPERSON_DISPLAYNAME'])) 
+			if (isset($_SERVER['HTTP_SHIB_INETORGPERSON_DISPLAYNAME']))
       {
-        $sfUser->setAttribute('sfShibboleth_display_name', 
+        $sfUser->setAttribute('sfShibboleth_display_name',
           $_SERVER['HTTP_SHIB_INETORGPERSON_DISPLAYNAME']);
       }
-			if (isset($_SERVER['REMOTE_USER'])) 
+			if (isset($_SERVER['REMOTE_USER']))
       {
         $name = $_SERVER['REMOTE_USER'];
 
@@ -97,9 +97,9 @@ class sfShibbolethFilter extends sfFilter
         // REMOTE_USER with or without a domain on the end, and
         // check for an sfGuard username with or without a domain.
         // on the end. Of course, if REMOTE_USER actually does
-        // specify a domain other than the default domain, 
-        // then only a full match will do. 
-        
+        // specify a domain other than the default domain,
+        // then only a full match will do.
+
         // The default domain is set in settings.yml.
 
         // The pretty case: an exact match
@@ -110,13 +110,13 @@ class sfShibbolethFilter extends sfFilter
 
         $domain = sfConfig::get("app_sfShibboleth_domain", false);
         if ($domain !== false) {
-          // Forward compatibility: REMOTE_USER contains the default domain, 
+          // Forward compatibility: REMOTE_USER contains the default domain,
           // so also check for database entries with no domain
           if (preg_match("/^(.*?)@$domain/i", $name, $matches)) {
             $where .= ' or username = ?';
             $args[] = $matches[1];
-          } 
-          // Backward compatibility: REMOTE_USER contains no domain, 
+          }
+          // Backward compatibility: REMOTE_USER contains no domain,
           // so also check for database entries with the default domain
           if (!preg_match("/@/", $name)) {
             $where .= ' or username = ?';
@@ -131,6 +131,17 @@ class sfShibbolethFilter extends sfFilter
           // Make a new user here
           $user = new sfGuardUser();
           $user->setUserName($name);
+
+          // newer sfDoctrineGuardPlugin insists on a unique email address
+          // whether you've got one to offer or not. Don't bomb on older
+          // sfDoctrineGuardPlugin though
+          if ($user->getTable()->hasField('email_address'))
+          {
+            // TODO: sometimes Shibboleth actually has this and it would be nice to use it.
+            // We'd have to update too
+            $user->setEmailAddress($name . '@notavalidaddress');
+          }
+
           // Set a secure, random sfGuard password. This is never used,
           // but if the user somehow misconfigures this plugin and
           // activates the sfGuardAuth module, we should have passwords
@@ -141,7 +152,7 @@ class sfShibbolethFilter extends sfFilter
 					if (class_exists('sfGuardUserProfile'))
 					{
 	          $profile = new sfGuardUserProfile();
-	          if ($sfUser->hasAttribute('sfShibboleth_display_name')) 
+	          if ($sfUser->hasAttribute('sfShibboleth_display_name'))
 	          {
 	            $profile->setDisplayName($sfUser->getAttribute('sfShibboleth_display_name'));
 	          }
@@ -160,7 +171,7 @@ class sfShibbolethFilter extends sfFilter
         $profile = $sfUser->getProfile();
         // Dynamically update display name if it has changed
         if ($sfUser->hasAttribute('sfShibboleth_display_name') && $profile &&
-          ($profile->getDisplayName() !== 
+          ($profile->getDisplayName() !==
             $sfUser->getAttribute('sfShibboleth_display_name')))
         {
           $profile->setDisplayName($sfUser->getAttribute('sfShibboleth_display_name'));
@@ -171,7 +182,7 @@ class sfShibbolethFilter extends sfFilter
 		}
     if ($sfUser->isAuthenticated())
     {
-      // The user exists and is signed in. But is their profile complete 
+      // The user exists and is signed in. But is their profile complete
       // enough for this site's needs? If not, force the user to the
       // registration action.
 
@@ -181,7 +192,7 @@ class sfShibbolethFilter extends sfFilter
 
       $action = sfConfig::get('app_sfShibboleth_register_action', false);
       if ($action && (!$sfUser->registrationIsComplete())) {
-        $currentAction = $request->getParameter('module') . '/' . 
+        $currentAction = $request->getParameter('module') . '/' .
           $request->getParameter('action');
         $exemptActions = sfConfig::get('app_sfShibboleth_register_exempt', array());
         // Always allow them to give up
