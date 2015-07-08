@@ -2,25 +2,9 @@ PROBLEM: you want to use Shibboleth to protect only PART of your URL space,
 so that you can have non-authenticated interactions with users who
 are not yet part of your community.
 
-OBVIOUS SOLUTION: you've tried to set this up with a <Location /shibboleth> 
-block that only applies Shibboleth authentication to /shibboleth...
+OBVIOUS SOLUTION: use a <Location /shibboleth> block. This totally works.
 
-But it doesn't work. The user is forced to log in, but Symfony
-never sees REMOTE_USER because Shibboleth is unimpressed by mod_rewrite
-and considers the front end controller to not be in /shibboleth. Ahrgh!
-
-CLEVER WORKAROUND: a real /shibboleth folder with a simple index.php script 
-that just requires the real front end controller from the parent folder... 
-after setting $_SERVER['REQUEST_URI'] and $_SERVER['PHP_SELF'] to the URL of 
-the sfShibbolethAuth/login action and scrubbing all references to
-/shibboleth, /shibboleth/ and /shibboleth/index.php from the 
-$_SERVER variables. When the sfShibbolethAuth/login action sees a good 
-REMOTE_USER environment variable, it redirects away immediately, 
-so the various potential problems of running the front end controller 
-from the "wrong" folder are nonissues for us.
-
-Sure, it's ugly, but it works great. At least until someone finds a way
-to make the original, elegant, Apache conf-based solution work.
+AUGH: you can't, for whatever reason. You need to use a <Directory> block instead. OK, here's how you can work around it by "shimming" the user back up into index.php.
 
 HOW TO INSTALL: copy this folder to the subfolder of your web folder
 that matches the path you are protecting directly with Shibboleth.
@@ -39,7 +23,7 @@ Install these new rules AFTER these existing rules:
     RewriteRule .* - [L]
 
 Then set the following in app.yml so that sfShibbolethPlugin will
-know to redirect users who are ready to authenticate to the special 
+know to redirect users who are ready to authenticate to the special
 controller in the shibbolized folder (substitute the folder you
 are directly shibbolizing if it's not /shibboleth):
 
@@ -49,6 +33,6 @@ prod:
 
 Finally, change the redirect URL in the shim folder's index.php
 script to point wherever YOUR routing rules have put sfShibbolethAuth/login.
-With pkContextCMS it's typically /cms/sfShibbolethAuth/login. With
+With Apostrophe it's typically /admin/sfShibbolethAuth/login. With
 no special routing rules in effect it'll be /sfShibbolethAuth/login.
 

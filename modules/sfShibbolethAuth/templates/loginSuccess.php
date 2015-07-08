@@ -1,9 +1,3 @@
-<?php
-  // Never seen in staging/production, which use
-  // real Shibboleth logins. TBB
-
-  use_helper('Form');
-?>
 <h2>
 Please Select a Test User
 </h2>
@@ -13,8 +7,8 @@ if you are seeing this on a production server you must immediately
 set <tt>app_shibboleth_fake</tt> to <tt>false</tt> in app.yml to
 preserve the security of your site!
 </p>
-<?php echo form_tag('sfShibbolethAuth/login') ?> 
-<?php echo select_tag('fake_user',
-  options_for_select($options, false)) ?>
-<?php echo submit_tag('Go', array("class" => "submit")) ?>
+
+<form action="<?php url_for('sfShibbolethAuth/login') ?>" method="post">
+<?php echo $form ?>
+<input type="submit" name="go" value="Go" class="submit">
 </form>

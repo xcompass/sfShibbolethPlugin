@@ -29,6 +29,14 @@ class sfShibbolethFilter extends sfFilter
     $sfUser = $context->getUser();
 		$request = $context->getRequest();
 
+    /**
+     * Make it compatible with fastcgi environments
+     */
+    if (isset($_SERVER['REDIRECT_REMOTE_USER']) && (!isset($_SERVER['REMOTE_USER'])))
+    {
+      $_SERVER['REMOTE_USER'] = $_SERVER['REDIRECT_REMOTE_USER'];
+    }
+
     if (sfConfig::get('app_sfShibboleth_fake', false))
     {
       // Accept the fake shibboleth attributes and stuff them into the
@@ -133,13 +141,19 @@ class sfShibbolethFilter extends sfFilter
           $user->setUserName($name);
 
           // newer sfDoctrineGuardPlugin insists on a unique email address
-          // whether you've got one to offer or not. Don't bomb on older
-          // sfDoctrineGuardPlugin though
+          // whether you've got one to offer or not. If the username is
+          // already suspiciously email-ish, use it directly. If not
+          // add a default domain from app.yml or just 'notavalidaddress'
           if ($user->getTable()->hasField('email_address'))
           {
-            // TODO: sometimes Shibboleth actually has this and it would be nice to use it.
-            // We'd have to update too
-            $user->setEmailAddress($name . '@notavalidaddress');
+            if (strpos($name, '@') === false)
+            {
+              $user->setEmailAddress($name . '@' . sfConfig::get('app_sfShibboleth_email_domain', 'notavalidaddress'));
+            }
+            else
+            {
+              $user->setEmailAddress($name);
+            }
           }
 
           // Set a secure, random sfGuard password. This is never used,
@@ -151,13 +165,13 @@ class sfShibbolethFilter extends sfFilter
 
 					if (class_exists('sfGuardUserProfile'))
 					{
-	          $profile = new sfGuardUserProfile();
-	          if ($sfUser->hasAttribute('sfShibboleth_display_name'))
-	          {
-	            $profile->setDisplayName($sfUser->getAttribute('sfShibboleth_display_name'));
-	          }
-	          $profile->setUserId($user->getId());
-	          $profile->save();
+	        $profile = new sfGuardUserProfile();
+	        if ($sfUser->hasAttribute('sfShibboleth_display_name'))
+	        {
+	          $profile->setDisplayName($sfUser->getAttribute('sfShibboleth_display_name'));
+	        }
+	        $profile->setUserId($user->getId());
+	        $profile->save();
 					}
         }
         if (sfConfig::get('app_sfShibboleth_superadmin', false) === $name)
@@ -168,15 +182,15 @@ class sfShibbolethFilter extends sfFilter
 
 				if (class_exists('sfGuardUserProfile'))
 				{
-        $profile = $sfUser->getProfile();
-        // Dynamically update display name if it has changed
-        if ($sfUser->hasAttribute('sfShibboleth_display_name') && $profile &&
-          ($profile->getDisplayName() !==
-            $sfUser->getAttribute('sfShibboleth_display_name')))
-        {
-          $profile->setDisplayName($sfUser->getAttribute('sfShibboleth_display_name'));
-          $profile->save();
-        }
+          $profile = $sfUser->getProfile();
+          // Dynamically update display name if it has changed
+          if ($sfUser->hasAttribute('sfShibboleth_display_name') && $profile &&
+            ($profile->getDisplayName() !==
+              $sfUser->getAttribute('sfShibboleth_display_name')))
+          {
+            $profile->setDisplayName($sfUser->getAttribute('sfShibboleth_display_name'));
+            $profile->save();
+          }
 				}
 			}
 		}
@@ -215,6 +229,17 @@ class sfShibbolethFilter extends sfFilter
           $filterChain->execute($filterChain);
           return;
         }
+      }
+    }
+    // It is common to mandate SSL for all logged-in actions when
+    // logging in via Shibboleth, CoSign and similar facilities
+    if ($sfUser->isAuthenticated() && sfConfig::get('app_sfShibboleth_secure_all_after_login'))
+    {
+      $uri = $request->getUri();
+      $uri = preg_replace("/^http:/", "https:", $uri);
+      if ($uri !== $request->getUri())
+      {
+        return $context->getController()->redirect($uri);
       }
     }
     $filterChain->execute($filterChain);
